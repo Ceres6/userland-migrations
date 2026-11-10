@@ -7,9 +7,17 @@ import { dirname, join } from 'node:path';
 
 type RemoveDependenciesOptions = {
 	packageJsonPath?: string;
+	/**
+	 * Content to process instead of the file at `packageJsonPath` (still used to locate the package), for
+	 * codemods that change more than the dependencies in the same write.
+	 */
+	packageJsonContent?: string;
 	runInstall?: boolean;
 	persistFileWrite?: boolean;
 };
+
+/** The indentation of a JSON document, so rewriting it doesn't reformat the whole file. */
+const indentationOf = (json: string) => /^([ \t]+)"/m.exec(json)?.[1] ?? 2;
 
 /**
  * Remove specified dependencies from package.json and run appropriate package manager install
@@ -35,7 +43,7 @@ export default async function removeDependencies(
 		return Promise.resolve(null);
 	}
 
-	if (!fileExists(packageJsonPath)) {
+	if (options.packageJsonContent === undefined && !fileExists(packageJsonPath)) {
 		console.log('No package.json found, skipping dependency removal');
 		return Promise.resolve(null);
 	}
@@ -45,7 +53,8 @@ export default async function removeDependencies(
 			? dependenciesToRemove
 			: [dependenciesToRemove];
 
-		const packageJsonContent = readFileSync(packageJsonPath, 'utf-8');
+		const packageJsonContent =
+			options.packageJsonContent ?? readFileSync(packageJsonPath, 'utf-8');
 		const packageJson = JSON.parse(packageJsonContent);
 
 		let modified = false;
@@ -77,7 +86,7 @@ export default async function removeDependencies(
 			return Promise.resolve(null);
 		}
 
-		const updatedContent = JSON.stringify(packageJson, null, 2);
+		const updatedContent = `${JSON.stringify(packageJson, null, indentationOf(packageJsonContent))}${packageJsonContent.endsWith('\n') ? '\n' : ''}`;
 
 		if (persistFileWrite) {
 			writeFileSync(packageJsonPath, updatedContent, 'utf-8');

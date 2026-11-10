@@ -1,0 +1,27 @@
+schema_version: "1.0"
+name: "@nodejs/jest-to-node-test-runner"
+version: 1.0.0
+capabilities:
+  - fs
+  - child_process
+description: Migrate Jest 30 test suites to the Node.js test runner, keeping Jest's expect
+author: Carlos Espa
+license: MIT
+workflow: workflow.yaml
+category: migration
+repository: https://github.com/nodejs/userland-migrations
+
+targets:
+  languages:
+    - javascript
+    - typescript
+
+keywords:
+  - transformation
+  - migration
+  - jest
+  - test
+
+registry:
+  access: public
+  visibility: public

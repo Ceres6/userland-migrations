@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/codemod-com/codemod/refs/heads/main/schemas/workflow.json
+
+version: "1"
+
+nodes:
+  - id: apply-transforms
+    name: Migrate test files to node:test
+    type: automatic
+    steps:
+      - name: Replace jest's globals, mocks and mock matchers with node:test's
+        js-ast-grep:
+          js_file: src/workflow.ts
+          base_path: .
+          include:
+            - "**/*.cjs"
+            - "**/*.cts"
+            - "**/*.js"
+            - "**/*.jsx"
+            - "**/*.mjs"
+            - "**/*.mts"
+            - "**/*.ts"
+            - "**/*.tsx"
+          exclude:
+            - "**/node_modules/**"
+            - "**/cypress/**"
+            - "**/*.cy.*"
+          language: typescript
+          capabilities:
+            - fs
+
+  - id: migrate-package-json
+    name: Run the tests with node --test
+    type: automatic
+    depends_on:
+      - apply-transforms
+    steps:
+      - name: Translate jest's scripts and configuration, and swap its dependencies for expect
+        js-ast-grep:
+          js_file: src/migrate-package-json.ts
+          base_path: .
+          include:
+            - "**/package.json"
+          exclude:
+            - "**/node_modules/**"
+          language: json
+          capabilities:
+            - child_process
+            - fs
+
+  - id: update-tsconfig
+    name: Drop jest's global types
+    type: automatic
+    depends_on:
+      - migrate-package-json
+    steps:
+      - name: Replace jest with node in compilerOptions.types
+        js-ast-grep:
+          js_file: src/update-tsconfig.ts
+          base_path: .
+          include:
+            - "**/tsconfig*.json"
+            - "**/jsconfig*.json"
+          exclude:
+            - "**/node_modules/**"
+          language: json
+          capabilities:
+            - fs

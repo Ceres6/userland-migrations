@@ -1,0 +1,21 @@
+{
+  "name": "inline-config",
+  "scripts": {
+    "test": "npx jest --coverage --runInBand",
+    "test:watch": "jest --watch",
+    "lint": "eslint ."
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "roots": ["<rootDir>/src"],
+    "setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
+    "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts"]
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "eslint": "^10.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.0",
+    "typescript": "^6.0.0"
+  }
+}

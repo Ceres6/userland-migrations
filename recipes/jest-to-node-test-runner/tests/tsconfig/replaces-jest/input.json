@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    // Global types only: test files import what they use
+    "types": [
+      "jest",
+      "cypress"
+    ],
+    "strict": true,
+  }
+}

@@ -256,6 +256,54 @@ describe('removeDependencies', () => {
 		}
 	});
 
+	it("should keep the file's indentation and final line break", async () => {
+		const tempDir = await mkdtemp(join(tmpdir(), 'remove-deps-test-'));
+		const originalCwd = process.cwd();
+
+		try {
+			process.chdir(tempDir);
+			await writeFile(
+				'package.json',
+				`${JSON.stringify({ name: 'test-package', devDependencies: { chalk: '^4.0.0', lodash: '^4.17.21' } }, null, 4)}\n`,
+			);
+
+			const result = await removeDependencies('chalk', {
+				runInstall: false,
+				persistFileWrite: false,
+			});
+
+			assert.strictEqual(
+				result,
+				`${JSON.stringify({ name: 'test-package', devDependencies: { lodash: '^4.17.21' } }, null, 4)}\n`,
+			);
+		} finally {
+			process.chdir(originalCwd);
+			await rm(tempDir, { recursive: true });
+		}
+	});
+
+	it('should process the given content instead of the file', async () => {
+		const tempDir = await mkdtemp(join(tmpdir(), 'remove-deps-test-'));
+		const packageJsonPath = join(tempDir, 'package.json');
+		const onDisk = JSON.stringify({ name: 'on-disk', dependencies: { chalk: '^4.0.0' } }, null, 2);
+
+		try {
+			await writeFile(packageJsonPath, onDisk);
+
+			const result = await removeDependencies('chalk', {
+				packageJsonPath,
+				packageJsonContent: JSON.stringify({ name: 'edited', dependencies: { chalk: '^4.0.0', lodash: '^4.17.21' } }, null, 2),
+				runInstall: false,
+				persistFileWrite: false,
+			});
+
+			assert.deepStrictEqual(JSON.parse(result ?? '{}'), { name: 'edited', dependencies: { lodash: '^4.17.21' } });
+			assert.strictEqual(readFileSync(packageJsonPath, 'utf-8'), onDisk);
+		} finally {
+			await rm(tempDir, { recursive: true });
+		}
+	});
+
 	it('should return null when package.json content is invalid', async () => {
 		const tempDir = await mkdtemp(join(tmpdir(), 'remove-deps-test-'));
 		const originalCwd = process.cwd();

@@ -1,0 +1,28 @@
+{
+  "name": "@nodejs/jest-to-node-test-runner",
+  "version": "1.0.0",
+  "description": "Migrate Jest test suites to the Node.js test runner, keeping Jest's expect",
+  "type": "module",
+  "scripts": {
+    "test": "node --run test:unit && node --run test:workflow && node --run test:package-json && node --run test:tsconfig",
+    "test:unit": "node --import=@nodejs/codemod-utils/codemod-jssg-context --test './src/**/*.test.ts'",
+    "test:workflow": "npx codemod jssg test -l typescript ./src/workflow.ts ./tests/workflow --allow-fs",
+    "test:package-json": "npx codemod jssg test -l json ./src/migrate-package-json.ts ./tests/package-json --allow-fs --allow-child-process",
+    "test:tsconfig": "npx codemod jssg test -l json ./src/update-tsconfig.ts ./tests/tsconfig --allow-fs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nodejs/userland-migrations.git",
+    "directory": "recipes/jest-to-node-test-runner",
+    "bugs": "https://github.com/nodejs/userland-migrations/issues"
+  },
+  "author": "Carlos Espa",
+  "license": "MIT",
+  "homepage": "https://github.com/nodejs/userland-migrations/blob/main/recipes/jest-to-node-test-runner/README.md",
+  "devDependencies": {
+    "@codemod.com/jssg-types": "^1.6.3"
+  },
+  "dependencies": {
+    "@nodejs/codemod-utils": "*"
+  }
+}

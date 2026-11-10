@@ -1,0 +1,6 @@
+{
+  "name": "no-jest",
+  "scripts": {
+    "test": "node --test"
+  }
+}
