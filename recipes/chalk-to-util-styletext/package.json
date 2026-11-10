@@ -1,0 +1,15 @@
+{
+    "name": "@nodejs/chalk-to-util-styletext",
+    "type": "module",
+    "scripts": {
+        "test": "node --run test:workflow && node --run test:remove-dependencies",
+        "test:workflow": "npx codemod jssg test -l typescript ./src/workflow.ts ./",
+        "test:remove-dependencies": "npx codemod jssg test -l json ./src/remove-dependencies.ts ./tests/remove-dependencies --allow-child-process --allow-fs --strictness cst"
+    },
+    "devDependencies": {
+        "@codemod.com/jssg-types": "^1.6.3"
+    },
+    "dependencies": {
+        "@nodejs/codemod-utils": "*"
+    }
+}

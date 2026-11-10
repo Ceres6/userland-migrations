@@ -1,6 +1,6 @@
 schema_version: "1.0"
 name: "@nodejs/crypto-rsa-pss-update"
-version: 1.0.1
+version: 1.0.2
 description: >-
   Handle DEP0154 via transforming deprecated RSA-PSS crypto options `hash` to
   `hashAlgorithm` and `mgf1Hash` to `mgf1HashAlgorithm`
@@ -8,6 +8,7 @@ author: Mauro Nievas
 license: MIT
 workflow: workflow.yaml
 category: migration
+repository: https://github.com/nodejs/userland-migrations
 
 targets:
   languages:
@@ -19,6 +20,7 @@ keywords:
   - migration
   - crypto
   - rsa-pss
+  - nodejs
 
 registry:
   access: public

@@ -11,15 +11,26 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to publish (format: v1.0.0@codemod-name)"
-        required: true
+        description: "Tag to publish (format: v1.0.0@codemod-name); ignored if sync_only"
+        required: false
         type: string
+      # For documentation-only changes, which warrant no version bump.
+      sync_only:
+        description: "Sync READMEs to nodejs/learn without publishing a codemod"
+        default: false
+        type: boolean
+
+permissions: read-all
 
 jobs:
   validate-and-publish:
     name: Validate and Publish Codemod
+    if: ${{ !inputs.sync_only }}
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       version: ${{ steps.parse-tag.outputs.version }}
       codemod-name: ${{ steps.parse-tag.outputs.codemod-name }}
@@ -27,12 +38,19 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            app.codemod.com:443
+            github.com:443
+            registry.npmjs.org:443
+            release-assets.githubusercontent.com:443
+            us.i.posthog.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -86,7 +104,7 @@ jobs:
           ls -lah "$CODEMOD_PATH"
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: ".nvmrc"
           cache: npm
@@ -103,14 +121,11 @@ jobs:
         working-directory: ${{ steps.parse-tag.outputs.codemod-path }}
         run: node --test
 
-      - name: Authenticate with Codemod registry
-        env:
-          CODEMOD_TOKEN: ${{ secrets.CODEMOD_TOKEN }}
-        run: npx codemod login --api-key "$CODEMOD_TOKEN"
 
-      - name: Publish codemod
-        working-directory: ${{ steps.parse-tag.outputs.codemod-path }}
-        run: npx codemod publish
+      - name: Publish codemod to registry
+        uses: codemod/publish-action@dd6c8dbc5ceb1a6146feba41481d88b43da50024 # v1
+        with:
+          path: ${{ steps.parse-tag.outputs.codemod-path }}
 
       - name: Create release summary
         env:
@@ -130,3 +145,12 @@ jobs:
 
           ✅ Codemod has been successfully published to the registry!
           EOF
+
+  refresh-learn:
+    name: Sync nodejs/learn
+    needs: validate-and-publish
+    # Runs on its own when sync_only skipped the publish job above.
+    if: ${{ !cancelled() && (inputs.sync_only || needs.validate-and-publish.result == 'success') }}
+    uses: ./.github/workflows/refresh-learn.yml
+    secrets:
+      LEARN_REPO_TOKEN: ${{ secrets.LEARN_REPO_TOKEN }}
