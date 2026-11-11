@@ -27,6 +27,8 @@ describe('member', () => {
 		assert.ok(Math.abs(member.distance - 67.8) < 0.5);
 		assert.ok(!Number.isNaN(member.score));
 		assert.ok(!('password' in member.toPrimitives()));
+		assert.partialDeepStrictEqual(member.toPrimitives(), { name: 'Ada', address: { city: 'London' } });
+		assert.throws(() => assert.partialDeepStrictEqual(member.toPrimitives(), { name: 'Bob' }), assert.AssertionError);
 		assert.deepEqual(member.tags, [
 			'admin',
 		]);
@@ -44,8 +46,13 @@ describe('member', () => {
 		assert.throws(() => Member.find('nobody'), { message: /Member not found \(nobody\)/ });
 		assert.throws(() => Member.find('nobody'), { message: /not found/i });
 		assert.doesNotThrow(() => Member.find('ada'));
+		assert.throws(() => assert.throws(() => Member.find('ada'), MemberNotFound), assert.AssertionError);
+		assert.throws(() => assert.throws(() => Member.find('ada'), { message: /not found/ }), assert.AssertionError);
+		assert.throws(() => assert.throws(() => Member.find('ada'), { message: new MemberNotFound('ada').message }), assert.AssertionError);
 		await assert.rejects(Member.load('nobody'), MemberNotFound);
 		assert.deepEqual(await Member.load('ada'), new Member('Ada'));
 		assert.notEqual(await Member.load('ada'), undefined);
+		assert.partialDeepStrictEqual(await Member.load('ada'), { name: 'Ada' });
+		await assert.rejects(async () => assert.partialDeepStrictEqual(await Member.load('ada'), { name: 'Bob' }), assert.AssertionError);
 	});
 });

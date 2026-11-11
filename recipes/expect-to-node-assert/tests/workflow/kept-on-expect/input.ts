@@ -12,6 +12,9 @@ it('keeps what node:assert would check less strictly', async () => {
 	expect(() => load()).toThrow(error);
 	expect(() => load()).toThrow(`not ${'found'}`);
 	expect(await load()).toHaveProperty('a.b');
+	expect([await load()]).not.toContainEqual({ name: 'Bob' });
+	expect(0.1 + 0.2).not.toBeCloseTo(0.4);
+	await expect(load()).rejects.not.toThrow(NotFound);
 	expect(await load()).toMatchInlineSnapshot();
 	await expect(load()).rejects.toStrictEqual(new NotFound());
 	await expect(load()).resolves.toThrow();

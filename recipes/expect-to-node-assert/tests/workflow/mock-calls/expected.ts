@@ -9,7 +9,7 @@ it('checks the calls', () => {
 	save(id, { force: true });
 
 	assert.ok(save.mock.calls.some((call) => isDeepStrictEqual(call.arguments, [id, { force: true }])));
-	assert.ok(!save.mock.calls.some((call) => isDeepStrictEqual(call.arguments, ['other'])));
+	expect(save.mock.calls.map((call) => call.arguments)).not.toContainEqual(['other']);
 	assert.deepEqual(save.mock.calls.at(-1)?.arguments, [id, { force: true }]);
 	assert.deepEqual(save.mock.calls[0]?.arguments, [id, { force: true }]);
 	assert.equal(save.mock.callCount(), 1);

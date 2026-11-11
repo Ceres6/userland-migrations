@@ -27,6 +27,8 @@ describe('member', () => {
 		expect(member.distance).toBeCloseTo(67.8, 0);
 		expect(member.score).not.toBeNaN();
 		expect(member.toPrimitives()).not.toHaveProperty('password');
+		expect(member.toPrimitives()).toMatchObject({ name: 'Ada', address: { city: 'London' } });
+		expect(member.toPrimitives()).not.toMatchObject({ name: 'Bob' });
 		expect(member.tags)
 			.toStrictEqual([
 				'admin',
@@ -46,8 +48,13 @@ describe('member', () => {
 		expect(() => Member.find('nobody')).toThrow('Member not found (nobody)');
 		expect(() => Member.find('nobody')).toThrow(/not found/i);
 		expect(() => Member.find('ada')).not.toThrow();
+		expect(() => Member.find('ada')).not.toThrow(MemberNotFound);
+		expect(() => Member.find('ada')).not.toThrow('not found');
+		expect(() => Member.find('ada')).not.toThrow(new MemberNotFound('ada'));
 		await expect(Member.load('nobody')).rejects.toThrow(MemberNotFound);
 		await expect(Member.load('ada')).resolves.toStrictEqual(new Member('Ada'));
 		await expect(Member.load('ada')).resolves.toBeDefined();
+		await expect(Member.load('ada')).resolves.toMatchObject({ name: 'Ada' });
+		await expect(Member.load('ada')).resolves.not.toMatchObject({ name: 'Bob' });
 	});
 });

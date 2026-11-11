@@ -129,7 +129,7 @@ const isClassName = (node: SgNode) => {
  * What `toThrow(expected)` checks, as `assert.throws()`'s second argument. A string there would be the
  * assertion's message, and a regular expression would also match the error's name: both go in `message`.
  */
-function thrownError(expected: SgNode | undefined): { reason: string } | { build: (rewrite: Rewrite) => string | undefined } {
+function thrownError(expected: SgNode | undefined, negated = false): { reason: string } | { build: (rewrite: Rewrite) => string | undefined } {
 	if (!expected) return { build: () => undefined };
 	const kind = expected.kind();
 	if (kind === 'regex') return { build: () => `{ message: ${expected.text()} }` };
@@ -139,8 +139,9 @@ function thrownError(expected: SgNode | undefined): { reason: string } | { build
 		return { build: () => (value ? `{ message: /${escapeRegExp(value)}/ }` : undefined) };
 	}
 	if (kind === 'template_string') return { reason: 'a computed message' };
-	// An error (compared by message and name, which is stricter than jest's message), or an error class
-	if (kind === 'new_expression' || isClassName(expected)) return { build: (rewrite) => rewrite(expected) };
+	// An error is compared by message and name, stricter than jest's message: negated, that would be looser
+	if (kind === 'new_expression') return { build: (rewrite) => (negated ? `{ message: ${rewrite(expected)}.message }` : rewrite(expected)) };
+	if (isClassName(expected)) return { build: (rewrite) => rewrite(expected) };
 	return { reason: `\`${expected.text()}\`, which could be an error class, a message or an error` };
 }
 
@@ -227,20 +228,19 @@ const ARITY: Record<string, [number, number]> = {
 	toMatch: [1, 1],
 	toBeCloseTo: [1, 2],
 	toHaveProperty: [1, 1],
+	toMatchObject: [1, 1],
 	toThrow: [0, 1],
 	toThrowError: [0, 1],
 };
 
 /**
  * How to migrate an assertion to node:assert, if it can be done without weakening it: every replacement checks
- * at least what jest checked, so a test that passes after the migration would have passed before.
+ * at least what jest checked, so a test that passes after the migration would have passed before. The exception
+ * is `toMatchObject()`, whose closest equivalent, `partialDeepStrictEqual()`, matches arrays less strictly.
  */
 export function plan(assertion: Assertion, context: Context): Plan {
 	const { matcher, not, promise, args, subject } = assertion;
 	const arity = ARITY[matcher];
-	if (matcher === 'toMatchObject') {
-		return unsupported('`toMatchObject()`: `assert.partialDeepStrictEqual()` would let arrays have more items, migrate it manually.');
-	}
 	if (!arity) return unsupported(`\`${matcher}()\` has no node:assert equivalent.`);
 	if (args.length < arity[0] || args.length > arity[1] || args.some((arg) => arg.kind() === 'spread_element')) {
 		return unsupported(`Unexpected \`${matcher}()\` arguments.`);
@@ -255,19 +255,28 @@ export function plan(assertion: Assertion, context: Context): Plan {
 		return `${assert}.${name}(${parts.join(', ')})`;
 	};
 
+	/**
+	 * A negated assertion node:assert has no function for: the positive one, expected to fail. Only with an
+	 * `AssertionError`, so errors computing the values still fail the test, as they did with jest.
+	 */
+	const failing = (positive: string, awaited = false) => {
+		context.needs.assert = true;
+		return awaited
+			? `await ${assert}.rejects(async () => ${positive}, ${assert}.AssertionError)`
+			: `${assert}.throws(() => ${positive}, ${assert}.AssertionError)`;
+	};
+
 	if (THROW_MATCHERS.has(matcher)) {
 		if (promise === 'resolves') return unsupported('`resolves.toThrow()` has no node:assert equivalent.');
-		if (not) {
-			return promise || args.length
-				? unsupported(`\`not.${matcher}()\` with an error to compare has no node:assert equivalent.`)
-				: { build: (rewrite) => call('doesNotThrow', rewrite(subject)) };
-		}
-		const error = thrownError(args[0]);
+		if (not && promise) return unsupported(`\`rejects.not.${matcher}()\` has no node:assert equivalent.`);
+		if (not && !args.length) return { build: (rewrite) => call('doesNotThrow', rewrite(subject)) };
+		const error = thrownError(args[0], not);
 		if ('reason' in error) return unsupported(`\`${matcher}()\` with ${error.reason}: migrate it manually.`);
 		return {
 			build: (rewrite) => {
 				const expected = error.build(rewrite);
-				return call(promise === 'rejects' ? 'rejects' : 'throws', rewrite(subject), ...(expected ? [expected] : []));
+				const assertion = call(promise === 'rejects' ? 'rejects' : 'throws', rewrite(subject), ...(expected ? [expected] : []));
+				return not ? failing(assertion) : assertion;
 			},
 		};
 	}
@@ -296,6 +305,15 @@ export function plan(assertion: Assertion, context: Context): Plan {
 			return { build: (rewrite) => call(method('deepEqual'), value(rewrite), rewrite(args[0])) };
 		case 'toStrictEqual':
 			return { build: (rewrite) => call(method(not ? 'notDeepEqual' : 'deepEqual'), value(rewrite), rewrite(args[0])) };
+		case 'toMatchObject':
+			// Unlike jest, it lets arrays have more items than expected (in order), the one looser replacement.
+			// Negated, it's stricter.
+			return {
+				build: (rewrite) => {
+					const positive = call('partialDeepStrictEqual', value(rewrite), rewrite(args[0]));
+					return not ? failing(positive, promise === 'resolves') : positive;
+				},
+			};
 		case 'toBeNull':
 			return { build: (rewrite) => call(method(not ? 'notEqual' : 'equal'), value(rewrite), 'null') };
 		case 'toBeUndefined':
@@ -320,6 +338,9 @@ export function plan(assertion: Assertion, context: Context): Plan {
 		case 'toContain':
 			return { build: (rewrite) => call('ok', `${bang}${asObject(actual(rewrite))}.includes(${rewrite(args[0])})`) };
 		case 'toContainEqual': {
+			if (not) {
+				return unsupported("`not.toContainEqual()`: `isDeepStrictEqual()` is stricter than jest's equality, so its negation would pass for items jest considers equal.");
+			}
 			const contains = containsEqual(assertion, actual, context);
 			if ('reason' in contains) return contains;
 			return { build: (rewrite) => call('ok', contains.build(rewrite)) };
@@ -335,6 +356,7 @@ export function plan(assertion: Assertion, context: Context): Plan {
 			return unsupported(`\`toMatch(${pattern.text()})\`: \`${pattern.text()}\` could be a string or a regular expression.`);
 		}
 		case 'toBeCloseTo': {
+			if (not) return unsupported('`not.toBeCloseTo()` would pass for two infinities, which jest considers close.');
 			const [, digits] = args;
 			const precision = digits ? Number(digits.text()) : 2;
 			if (digits && (digits.kind() !== 'number' || !Number.isInteger(precision))) {

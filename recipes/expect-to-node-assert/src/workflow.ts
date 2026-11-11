@@ -14,12 +14,10 @@ const languageOf = (filename: string) => (/\.[cm]?ts$/.test(filename) ? 'typescr
 
 /**
  * Migrates the assertions of a file using the `expect` package to node:assert, keeping on expect those that
- * node:assert can't check as strictly.
+ * node:assert can't check as strictly. Returns `null` for files that don't import `expect`.
  */
-export default function transform(root: SgRoot<TS>): string | null {
-	const filename = root.filename();
+export function migrateFile(filename: string, relativeFilename: string, original: string): { text: string; warnings: string[] } | null {
 	const language = languageOf(filename);
-	const original = root.root().text();
 
 	// Parsed again by extension: .tsx and JSX need the tsx grammar
 	const parsed = parse(language, original) as SgRoot;
@@ -36,16 +34,24 @@ export default function transform(root: SgRoot<TS>): string | null {
 		isDeepStrictEqual: names.isDeepStrictEqual,
 		needs: { assert: false, isDeepStrictEqual: false },
 		pinned: [],
-		warn: (node, message) => warnings.push(`${root.relativeFilename()}:${node.range().start.line + 1}: ${message}`),
+		warn: (node, message) => warnings.push(`${relativeFilename}:${node.range().start.line + 1}: ${message}`),
 	};
 
 	const tree = parsed.root();
 	const countRules = assertionCountRules(tree, context);
-	let text = createRewriter(context.source, [...countRules, ...assertionRules(context)])(tree);
+	const text = createRewriter(context.source, [...countRules, ...assertionRules(context)])(tree);
 
 	const rewritten = parse(language, text) as SgRoot;
-	text = rewritten.root().commitEdits(importEdits(rewritten, new Source(text), expectImports(rewritten), context.needs, names));
+	return {
+		text: rewritten.root().commitEdits(importEdits(rewritten, new Source(text), expectImports(rewritten), context.needs, names)),
+		warnings,
+	};
+}
 
-	for (const message of warnings) warn(message);
-	return text === original ? null : text;
+export default function transform(root: SgRoot<TS>): string | null {
+	const original = root.root().text();
+	const migrated = migrateFile(root.filename(), root.relativeFilename(), original);
+	if (!migrated) return null;
+	for (const message of migrated.warnings) warn(message);
+	return migrated.text === original ? null : migrated.text;
 }
