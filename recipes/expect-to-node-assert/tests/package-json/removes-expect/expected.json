@@ -1,0 +1,10 @@
+{
+    "name": "app",
+    "scripts": {
+        "test": "node --import tsx --test \"src/**/*.test.ts\"",
+        "test:watch": "node --test --watch"
+    },
+    "devDependencies": {
+        "tsx": "^4.21.0"
+    }
+}

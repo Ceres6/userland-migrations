@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/codemod-com/codemod/refs/heads/main/schemas/workflow.json
+
+version: "1"
+
+nodes:
+  - id: apply-transforms
+    name: Migrate assertions to node:assert
+    type: automatic
+    steps:
+      - name: Replace expect's matchers with node:assert's assertions
+        js-ast-grep:
+          js_file: src/workflow.ts
+          base_path: .
+          include:
+            - "**/*.cjs"
+            - "**/*.cts"
+            - "**/*.js"
+            - "**/*.jsx"
+            - "**/*.mjs"
+            - "**/*.mts"
+            - "**/*.ts"
+            - "**/*.tsx"
+          exclude:
+            - "**/node_modules/**"
+          language: typescript
+
+  - id: remove-expect
+    name: Remove expect once unused
+    type: automatic
+    depends_on:
+      - apply-transforms
+    steps:
+      - name: Remove the expect dependency and the setup file checking its assertion counts
+        js-ast-grep:
+          js_file: src/migrate-package-json.ts
+          base_path: .
+          include:
+            - "**/package.json"
+          exclude:
+            - "**/node_modules/**"
+          language: json
+          capabilities:
+            - child_process
+            - fs

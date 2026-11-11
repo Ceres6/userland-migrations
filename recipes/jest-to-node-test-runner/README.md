@@ -16,6 +16,8 @@ npx codemod @nodejs/jest-to-node-test-runner
 
 Then install the updated dependencies (e.g. `npm install`) and run the tests. The codemod prints a warning for everything it can't migrate: review them before committing.
 
+To move the assertions to `node:assert` too, run [`@nodejs/expect-to-node-assert`](https://github.com/nodejs/userland-migrations/tree/main/recipes/expect-to-node-assert) next.
+
 ## Examples
 
 ### Globals and mocks
