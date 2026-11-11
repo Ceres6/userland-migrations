@@ -29,22 +29,30 @@ export function createRewriter(source: Source, rules: Rule[]) {
 		const dropsStatements = STATEMENT_LISTS.has(node.kind() as string);
 		let out = '';
 		let position = start.index;
+		// Whether a statement was just removed, leaving a blank line (or the block's start) right before it
+		let removedAfterBreak = false;
 
 		for (const child of children) {
 			const range = child.range();
-			const gap = source.slice(position, range.start.index);
+			let gap = source.slice(position, range.start.index);
+			// No two blank lines where the statement was, and none at the start of the block
+			if (removedAfterBreak) gap = gap.replace(/^\n[ \t]*(?=\r?\n)/, '');
+			removedAfterBreak = false;
 			const replacement = override?.(child) ?? apply(child);
 
 			if (replacement === REMOVE && dropsStatements) {
 				// Drop the statement's line: the indentation and line break before it go too
 				const lineBreak = gap.lastIndexOf('\n');
 				out += lineBreak === -1 ? gap : gap.slice(0, lineBreak);
+				removedAfterBreak = /(^|\n)[ \t]*\r?$/.test(out) || /\{$/.test(out);
 			} else {
 				out += gap + (replacement === REMOVE ? source.slice(range.start.index, range.end.index) : replacement);
 			}
 			position = range.end.index;
 		}
 
+		// A blank line left before the end of the block
+		if (removedAfterBreak) out = out.replace(/\r?\n[ \t]*$/, '');
 		return out + source.slice(position, end.index);
 	};
 
