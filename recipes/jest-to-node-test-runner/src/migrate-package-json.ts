@@ -3,7 +3,8 @@
  * Runs in JSSG, which provides a subset of Node.js' APIs: https://github.com/awslabs/llrt/blob/main/API.md
  */
 import { spawn } from 'node:child_process';
-import { accessSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+// A namespace: dry runs provide other functions (no `rmSync`), and a missing named import fails the whole step
+import * as fs from 'node:fs';
 import { join } from 'node:path';
 import { warn } from 'codemod:runtime';
 import type { SgRoot, TransformOptions } from '@codemod.com/jssg-types/main';
@@ -19,7 +20,7 @@ const decoder = new TextDecoder();
 
 const exists = (path: string) => {
 	try {
-		accessSync(path);
+		fs.accessSync(path);
 		return true;
 	} catch {
 		return false;
@@ -28,7 +29,7 @@ const exists = (path: string) => {
 
 const read = (path: string) => {
 	try {
-		return readFileSync(path, 'utf8');
+		return fs.readFileSync(path, 'utf8');
 	} catch {
 		return undefined;
 	}
@@ -64,7 +65,7 @@ function loadConfig(path: string): Promise<JestConfig> {
 }
 
 function usesAssertionCounts(directory: string): boolean {
-	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+	for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
 		const path = join(directory, entry.name);
 		if (entry.isDirectory()) {
 			if (!SKIPPED_DIRECTORIES.has(entry.name) && usesAssertionCounts(path)) return true;
@@ -78,7 +79,7 @@ function usesAssertionCounts(directory: string): boolean {
 const io: ProjectIO = {
 	exists,
 	read,
-	list: (directory) => readdirSync(directory),
+	list: (directory) => fs.readdirSync(directory),
 	loadConfig,
 	installedVersion: (directory, name) => {
 		const manifest = read(join(directory, 'node_modules', name, 'package.json'));
@@ -104,8 +105,8 @@ export default async function transform(root: SgRoot<Json>, options?: TransformO
 	if (!migration) return null;
 
 	if (!options?.dryRun) {
-		for (const file of migration.remove) rmSync(file);
-		for (const [file, content] of migration.write) writeFileSync(file, content);
+		for (const file of migration.remove) fs.rmSync(file);
+		for (const [file, content] of migration.write) fs.writeFileSync(file, content);
 	}
 	return migration.packageJson;
 }

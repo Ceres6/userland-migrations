@@ -1,16 +1,17 @@
 import { join } from 'node:path';
-import { readFileSync, accessSync, constants } from 'node:fs';
+import { readFileSync, accessSync } from 'node:fs';
 import type JS from '@codemod.com/jssg-types/langs/javascript';
 import type { SgNode } from '@codemod.com/jssg-types/main';
 
 /**
  * This api didn't exist on JSSG (behind the scenesn it use llrt)
+ * `accessSync()` checks for existence by default: `constants` isn't available in dry runs.
  *
  * @param path name of the file to check for existence
  */
 const existsSync = (path: string) => {
 	try {
-		accessSync(path, constants.F_OK);
+		accessSync(path);
 		return true;
 	} catch {
 		return false;

@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { warn } from 'codemod:runtime';
-import type { Edit, SgNode, SgRoot } from '@codemod.com/jssg-types/main';
+import type { Edit, SgNode, SgRoot, TransformOptions } from '@codemod.com/jssg-types/main';
 import type Json from '@codemod.com/jssg-types/langs/json';
 
 const JEST_TYPES = /^"(jest|@types\/jest)"$/;
@@ -24,7 +24,7 @@ const elementsOf = (array: SgNode<Json>) => array.children().filter((child) => c
  * Removes jest's global types from `compilerOptions.types` (adding Node.js' ones, which node:test's come
  * with, if the list doesn't have them).
  */
-export default async function transform(root: SgRoot<Json>): Promise<string | null> {
+export default async function transform(root: SgRoot<Json>, options?: TransformOptions<Json>): Promise<string | null> {
 	const edits: Edit[] = [];
 
 	for (const array of root.root().findAll({
@@ -39,7 +39,8 @@ export default async function transform(root: SgRoot<Json>): Promise<string | nu
 
 		const pkg = packageJsonFor(root.filename());
 		const dependencies = { ...pkg?.dependencies, ...pkg?.devDependencies };
-		if ('jest' in dependencies || '@types/jest' in dependencies) {
+		// A dry run doesn't write package.json, from which the previous step removes jest whenever it's there
+		if (!options?.dryRun && ('jest' in dependencies || '@types/jest' in dependencies)) {
 			warn(`${root.relativeFilename()}: jest is still a dependency, its types were kept.`);
 			return null;
 		}
